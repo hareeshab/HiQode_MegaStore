@@ -77,3 +77,135 @@ curl -s "http://127.0.0.1:8080/api/catalog/seed?reset=1"
 email: user@hiqode.in
 pass:  pass123
 
+
+
+
+Coupons
+
+HIQODE10 → 10% off
+DEVOPS20 → 20% off
+
+🏗 Architecture
+flowchart LR
+  User((Browser)) -->|80/8080| NGINX[Gateway]
+  NGINX --> FE[Frontend (Nginx)]
+  NGINX --> AUTH[Auth (FastAPI)]
+  NGINX --> CAT[Catalog (Node)]
+  NGINX --> ORD[Orders (FastAPI)]
+  NGINX --> PAY[Payments (Node)]
+  ORD -->|AMQP| MQ[(RabbitMQ)]
+  WRK[Worker (Python)] -->|consume| MQ
+  WRK -->|HTTP| PAY
+  WRK -->|SMTP 1025| MH[MailHog]
+  AUTH -.->|Postgres 5432| PG[(Postgres)]
+  ORD  -.->|Postgres 5432| PG
+  CAT  -.->|Mongo 27017| MONGO[(MongoDB)]
+  WRK -.->|6379| REDIS[(Redis)]
+
+📦 Services (compose)
+gateway/              # NGINX reverse proxy (dynamic resolver)
+frontend/             # React + Vite + Tailwind
+services/
+  auth/               # FastAPI + Postgres (usersdb)
+  catalog/            # Node + Mongo (seeded categories + images)
+  orders/             # FastAPI + Postgres (ordersdb, /list)
+  payments/           # Mock payments (Node)
+  worker/             # Python consumer -> payments + MailHog email
+db/
+  init.sql            # Bootstraps usersdb + ordersdb
+docker-compose.yml
+
+🧪 How to Demo
+
+Open Storefront → http://<server-ip>:8080
+
+Categories: All / Clothing / Footwear / Groceries (with large images)
+
+Add to cart → Checkout → Login prompt (use demo credentials)
+
+Apply coupon (HIQODE10 or DEVOPS20) and Pay & Place Order
+
+Open MailHog (:8025) and show the order email
+
+Check RabbitMQ (:15672) – queue orders empties as worker consumes
+
+Show Order History (#/orders) in the app
+
+🔧 Common Commands
+# See only this project’s containers
+docker compose ps
+
+# Tail specific service logs
+docker compose logs -f gateway
+docker compose logs -f frontend
+docker compose logs -f worker
+
+# Rebuild just the UI
+docker compose build frontend && docker compose up -d frontend && docker compose restart gateway
+
+# Reseed products (safe, idempotent)
+curl -s "http://127.0.0.1:8080/api/catalog/seed?reset=1"
+
+🧭 Troubleshooting
+
+[!IMPORTANT]
+The gateway uses Docker DNS dynamically (resolver 127.0.0.11) to avoid 502s when container IPs change.
+
+<details> <summary><b>❌ 502 Bad Gateway (root / or /api/...)</b></summary>
+
+Restart the gateway to refresh upstream resolution:
+
+docker compose restart gateway
+
+
+Confirm the target service is up:
+
+docker compose ps
+docker compose logs --tail=100 catalog   # or auth / orders
+
+</details> <details> <summary><b>📭 No emails in MailHog</b></summary>
+
+Ensure worker is running and connected:
+
+docker compose ps worker
+docker compose logs --tail=150 worker
+
+
+RabbitMQ should be healthy and credentials match (megashop/megashop):
+
+UI: http://<server-ip>:15672
+
+</details> <details> <summary><b>🗃 Catalog shows no images/categories</b></summary>
+
+Run the seed endpoint:
+
+curl -s "http://127.0.0.1:8080/api/catalog/seed?reset=1"
+
+
+Verify:
+
+curl -s http://127.0.0.1:8080/api/catalog/categories
+curl -s "http://127.0.0.1:8080/api/catalog/products?category=Clothing"
+
+</details>
+⚙️ Notes
+
+RabbitMQ credentials & healthcheck are preconfigured (compose).
+
+Worker auto-retries on connection errors and waits for dependencies.
+
+Gateway proxies:
+
+/ → frontend
+
+/api/auth/* → auth
+
+/api/catalog/* → catalog
+
+/api/orders/* → orders
+
+/api/pay/* → payments
+
+🧹 Clean Up
+docker compose down         # stop stack
+docker compose down -v      # remove volumes (DB data!)
