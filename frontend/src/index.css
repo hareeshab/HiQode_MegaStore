@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+html{scroll-behavior:smooth}
+.scroll-row{overflow-x:auto;padding-bottom:.5rem;scroll-snap-type:x mandatory}
+.scroll-row>*{scroll-snap-align:start}
+
+:root { color-scheme: light; }
+body { @apply bg-gray-50 text-gray-900; }
+.btn { @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-brand text-white hover:bg-brand-dark transition; }
+.card { @apply bg-white rounded-2xl shadow-smooth; }

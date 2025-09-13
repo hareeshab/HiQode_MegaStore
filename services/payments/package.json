@@ -1,0 +1,8 @@
+{
+  "name": "payments-service",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "dependencies": { "express": "^4.18.3", "cors": "^2.8.5" },
+  "scripts": { "start": "node server.js" }
+}
