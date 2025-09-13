@@ -63,11 +63,5 @@ docker compose up -d --build
 curl -s "http://127.0.0.1:8080/api/catalog/seed?reset=1"
 
 
-🌐 URLs & Credentials
 
-| Component      | URL                        | Notes                         |
-| -------------- | -------------------------- | ----------------------------- |
-| Storefront     | `http://<server-ip>:8080`  | Browse, add to cart, checkout |
-| MailHog (SMTP) | `http://<server-ip>:8025`  | View order emails             |
-| RabbitMQ UI    | `http://<server-ip>:15672` | **megashop / megashop**       |
 
