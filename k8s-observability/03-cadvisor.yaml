@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cadvisor
+  namespace: observability
+  labels: { app: cadvisor }
+spec:
+  selector: { matchLabels: { app: cadvisor } }
+  template:
+    metadata: { labels: { app: cadvisor } }
+    spec:
+      containers:
+      - name: cadvisor
+        image: gcr.io/cadvisor/cadvisor:v0.49.1
+        ports: [ { containerPort: 9323, name: http } ]
+        volumeMounts:
+        - { name: rootfs, mountPath: /rootfs, readOnly: true }
+        - { name: varrun, mountPath: /var/run, readOnly: false }
+        - { name: sys,    mountPath: /sys, readOnly: true }
+        - { name: docker, mountPath: /var/lib/docker, readOnly: true }
+      volumes:
+      - { name: rootfs, hostPath: { path: /, type: Directory } }
+      - { name: varrun, hostPath: { path: /var/run, type: Directory } }
+      - { name: sys,    hostPath: { path: /sys, type: Directory } }
+      - { name: docker, hostPath: { path: /var/lib/docker, type: DirectoryOrCreate } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cadvisor
+  namespace: observability
+  labels: { app: cadvisor }
+spec:
+  clusterIP: None
+  selector: { app: cadvisor }
+  ports:
+  - name: http
+    port: 9323
+    targetPort: http

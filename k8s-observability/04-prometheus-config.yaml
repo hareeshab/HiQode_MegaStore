@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: observability
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    scrape_configs:
+      - job_name: 'node-exporter'
+        static_configs:
+        - targets: ['node-exporter.observability.svc.cluster.local:9100']
+
+      - job_name: 'cadvisor'
+        static_configs:
+        - targets: ['cadvisor.observability.svc.cluster.local:9323']
+
+      - job_name: 'rabbitmq'
+        metrics_path: /metrics
+        static_configs:
+        - targets: ['rabbitmq.megashop.svc.cluster.local:15692']
+
+      - job_name: 'blackbox_http'
+        metrics_path: /probe
+        params:
+          module: [http_2xx]
+        static_configs:
+        - targets:
+          - 'http://gateway.megashop.svc.cluster.local:80/'
+          - 'http://gateway.megashop.svc.cluster.local:80/api/catalog/products'
+          - 'http://gateway.megashop.svc.cluster.local:80/api/auth/login'
+        relabel_configs:
+        - source_labels: [__address__]
+          target_label: __param_target
+        - source_labels: [__param_target]
+          target_label: instance
+        - target_label: __address__
+          replacement: blackbox.observability.svc.cluster.local:9115
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: observability
+  labels: { app: prometheus }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: prometheus } }
+  template:
+    metadata: { labels: { app: prometheus } }
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v2.55.1
+        args:
+        - --config.file=/etc/prometheus/prometheus.yml
+        - --storage.tsdb.retention.time=7d
+        - --web.enable-lifecycle
+        ports: [ { containerPort: 9090, name: http } ]
+        volumeMounts:
+        - { name: cfg, mountPath: /etc/prometheus }
+      volumes:
+      - name: cfg
+        configMap:
+          name: prometheus-config
+          items:
+          - key: prometheus.yml
+            path: prometheus.yml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: observability
+  labels: { app: prometheus }
+spec:
+  ports: [ { name: http, port: 9090, targetPort: http } ]
+  selector: { app: prometheus }

@@ -1,0 +1,147 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-admin
+  namespace: observability
+type: Opaque
+stringData:
+  admin-user: admin
+  admin-password: admin123
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: observability
+data:
+  datasources.yaml: |
+    {
+  "apiVersion": 1,
+  "datasources": [
+    {
+      "name": "Prometheus",
+      "type": "prometheus",
+      "access": "proxy",
+      "url": "http://prometheus.observability.svc.cluster.local:9090",
+      "isDefault": true
+    },
+    {
+      "name": "Loki",
+      "type": "loki",
+      "access": "proxy",
+      "url": "http://loki.observability.svc.cluster.local:3100"
+    }
+  ]
+}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: observability
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+    - name: 'default'
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: true
+      options:
+        path: /var/lib/grafana/dashboards
+  megashop-overview.json: |
+    {
+      "title": "MegaShop Overview",
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "10s",
+      "time": {"from": "now-6h", "to": "now"},
+      "panels": [
+        {
+          "type": "stat",
+          "title": "Gateway 2xx Probe",
+          "datasource": "Prometheus",
+          "targets": [{"expr": "probe_success{job=\"blackbox_http\",instance=\"http://gateway.megashop.svc.cluster.local:80/\"}"}],
+          "gridPos": {"h": 5, "w": 6, "x": 0, "y": 0}
+        },
+        {
+          "type": "timeseries",
+          "title": "RabbitMQ Scrape Latency",
+          "datasource": "Prometheus",
+          "targets": [{"expr": "scrape_duration_seconds{job=\"rabbitmq\"}"}],
+          "gridPos": {"h": 8, "w": 12, "x": 6, "y": 0}
+        },
+        {
+          "type": "timeseries",
+          "title": "Node CPU (avg)",
+          "datasource": "Prometheus",
+          "targets": [{"expr": "avg(rate(node_cpu_seconds_total{mode!=\"idle\"}[5m]))"}],
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 5}
+        },
+        {
+          "type": "logs",
+          "title": "Latest Logs (Loki)",
+          "datasource": "Loki",
+          "targets": [{"expr": "{{kubernetes_namespace}}=~\"megashop|observability\"", "refId":"A"}],
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 13}
+        }
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: observability
+  labels: { app: grafana }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: grafana } }
+  template:
+    metadata: { labels: { app: grafana } }
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:11.1.4
+        ports: [ { containerPort: 3000, name: http } ]
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          valueFrom: { secretKeyRef: { name: grafana-admin, key: admin-user } }
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom: { secretKeyRef: { name: grafana-admin, key: admin-password } }
+        - name: GF_INSTALL_PLUGINS
+          value: grafana-piechart-panel
+        volumeMounts:
+        - { name: dashboards, mountPath: /var/lib/grafana/dashboards }
+        - { name: provisioning-datasources, mountPath: /etc/grafana/provisioning/datasources }
+        - { name: provisioning-dashboards, mountPath: /etc/grafana/provisioning/dashboards }
+      volumes:
+      - name: dashboards
+        configMap:
+          name: grafana-dashboards
+          items:
+          - key: megashop-overview.json
+            path: megashop-overview.json
+      - name: provisioning-datasources
+        configMap:
+          name: grafana-datasources
+          items:
+          - key: datasources.yaml
+            path: datasources.yaml
+      - name: provisioning-dashboards
+        configMap:
+          name: grafana-dashboards
+          items:
+          - key: dashboards.yaml
+            path: dashboards.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: observability
+  labels: { app: grafana }
+spec:
+  ports: [ { name: http, port: 3000, targetPort: http } ]
+  selector: { app: grafana }
