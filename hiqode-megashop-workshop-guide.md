@@ -1,11 +1,11 @@
 # HiQode MegaShop — End‑to‑End Workshop (EKS)
 
-This is a copy‑paste friendly runbook to stand up the **MegaShop** microservices app on **AWS EKS**, using images from your **private Docker Hub** repo `30051989/hiqode` with service‑as‑tag naming.
+**MegaShop** microservices app on **AWS EKS**, using images from your **private Docker Hub** repo `30051989/hiqode` with service‑as‑tag naming.
 
 It covers:
 1) Cluster creation  
 2) Cluster configuration (EBS CSI, StorageClass, Ingress)  
-3) Manifests with fixes (gateway image and Postgres `PGDATA`)  
+3) Manifests (gateway image and Postgres `PGDATA`)  
 4) Troubleshooting  
 5) Demo storyline & talking points
 
