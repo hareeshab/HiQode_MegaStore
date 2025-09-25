@@ -1,0 +1,13 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seed-catalog
+  namespace: megashop
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: curl
+        image: curlimages/curl:8.8.0
+        args: ["-sS", "http://gateway.megashop.svc.cluster.local/api/catalog/seed?reset=1"]

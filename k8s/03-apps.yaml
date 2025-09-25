@@ -1,0 +1,145 @@
+apiVersion: v1
+kind: Service
+metadata: { name: frontend, namespace: megashop }
+spec:
+  ports: [{ port: 80, targetPort: 80 }]
+  selector: { app: frontend }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: frontend, namespace: megashop }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: frontend } }
+  template:
+    metadata: { labels: { app: frontend } }
+    spec:
+      containers:
+      - name: frontend
+        image: 30051989/hiqode:hiqode-megashop-frontend
+        ports: [{ containerPort: 80 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: auth, namespace: megashop }
+spec:
+  ports: [{ port: 8001, targetPort: 8001 }]
+  selector: { app: auth }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: auth, namespace: megashop }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: auth } }
+  template:
+    metadata: { labels: { app: auth } }
+    spec:
+      containers:
+      - name: auth
+        image: 30051989/hiqode:hiqode-megashop-auth
+        ports: [{ containerPort: 8001 }]
+        env:
+        - { name: DATABASE_URL, value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres.megashop.svc.cluster.local:5432/usersdb" }
+        - { name: JWT_SECRET,   valueFrom: { secretKeyRef: { name: megashop-secrets, key: JWT_SECRET } } }
+        envFrom: [{ secretRef: { name: megashop-secrets } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: catalog, namespace: megashop }
+spec:
+  ports: [{ port: 8002, targetPort: 8002 }]
+  selector: { app: catalog }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: catalog, namespace: megashop }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: catalog } }
+  template:
+    metadata: { labels: { app: catalog } }
+    spec:
+      containers:
+      - name: catalog
+        image: 30051989/hiqode:hiqode-megashop-catalog
+        ports: [{ containerPort: 8002 }]
+        env:
+        - { name: MONGO_URL, value: "mongodb://mongo.megashop.svc.cluster.local:27017/megashop" }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: orders, namespace: megashop }
+spec:
+  ports: [{ port: 8003, targetPort: 8003 }]
+  selector: { app: orders }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: orders, namespace: megashop }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: orders } }
+  template:
+    metadata: { labels: { app: orders } }
+    spec:
+      containers:
+      - name: orders
+        image: 30051989/hiqode:hiqode-megashop-orders
+        ports: [{ containerPort: 8003 }]
+        env:
+        - { name: DATABASE_URL, value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres.megashop.svc.cluster.local:5432/usersdb" }
+        - { name: AMQP_URL,      value: "amqp://$(RABBITMQ_USER):$(RABBITMQ_PASSWORD)@rabbitmq.megashop.svc.cluster.local:5672" }
+        envFrom: [{ secretRef: { name: megashop-secrets } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: payments, namespace: megashop }
+spec:
+  ports: [{ port: 8004, targetPort: 8004 }]
+  selector: { app: payments }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: payments, namespace: megashop }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: payments } }
+  template:
+    metadata: { labels: { app: payments } }
+    spec:
+      containers:
+      - name: payments
+        image: 30051989/hiqode:hiqode-megashop-payments
+        ports: [{ containerPort: 8004 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: gateway, namespace: megashop }
+spec:
+  ports: [{ port: 80, targetPort: 80 }]
+  selector: { app: gateway }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: gateway, namespace: megashop }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: gateway }
+  template:
+    metadata: { labels: { app: gateway } }
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.25-alpine
+        ports: [{ containerPort: 80 }]
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+      volumes:
+      - name: config
+        configMap:
+          name: gateway-nginx
+          items: [{ key: nginx.conf, path: nginx.conf }]
