@@ -129,15 +129,27 @@ _Unzip and `cd` into the folder that contains `k8s/`._
 
 ### 3.2 Create namespace + imagePullSecret for Docker Hub (private)
 ```bash
-export DOCKERHUB_USER=30051989
-export DOCKERHUB_TOKEN=<your_dockerhub_access_token>
+# 1) Correct exports (NO spaces; quote the token)
+export DOCKERHUB_USER='$DOCKERHUB_USER'
+export DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN'
 
-kubectl apply -f k8s/00-namespace.yaml
+# sanity check
+[ -n "$DOCKERHUB_USER" ] && [ -n "$DOCKERHUB_TOKEN" ] && echo "vars ok" || echo "missing"
 
-kubectl -n megashop create secret docker-registry dockerhub-cred   --docker-server=index.docker.io   --docker-username="$DOCKERHUB_USER"   --docker-password="$DOCKERHUB_TOKEN"   --docker-email="noreply@example.com"   --dry-run=client -o yaml | kubectl apply -f -
+# 2) Create/Update the pull secret (Docker Hub requires this server URL)
+kubectl -n megashop create secret docker-registry dockerhub-cred \
+  --docker-server='https://index.docker.io/v1/' \
+  --docker-username="$DOCKERHUB_USER" \
+  --docker-password="$DOCKERHUB_TOKEN" \
+  --dry-run=client -o yaml | kubectl apply -f -
 
-# Attach secret to default SA so all pods can pull
-kubectl -n megashop patch serviceaccount default   -p '{"imagePullSecrets":[{"name":"dockerhub-cred"}]}'
+# 3) Attach to default ServiceAccount (so new pods can pull)
+kubectl -n megashop patch serviceaccount default \
+  -p '{"imagePullSecrets":[{"name":"dockerhub-cred"}]}'
+
+# 4) Verify
+kubectl -n megashop get secret dockerhub-cred -o jsonpath='{.type}{"\n"}'     # should print: kubernetes.io/dockerconfigjson
+
 ```
 
 ### 3.3 Apply config, data layer, apps, ingress
