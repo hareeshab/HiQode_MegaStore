@@ -4,7 +4,7 @@ set -euo pipefail
 ### === USER VARS (EDIT) =====================================================
 : "${CLUSTER:=megashop}"
 : "${AWS_REGION:=us-east-1}"
-: "${DOCKERHUB_USER:=30051989}"
+: "${DOCKERHUB_USER:=$USER}"
 : "${DOCKERHUB_TOKEN:=CHANGE_ME}"   # <-- put your Docker Hub access token here
 ### ==========================================================================
 
